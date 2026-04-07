@@ -1,0 +1,8 @@
+{
+  "name": "agent-invoke",
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "@aws-sdk/client-bedrock-agent-runtime": "^3.576.0"
+  }
+}
