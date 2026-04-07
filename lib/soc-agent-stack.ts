@@ -124,6 +124,12 @@ export class SocAgentStack extends Stack {
       }),
     );
 
+    lambdaRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ['states:SendTaskSuccess', 'states:SendTaskFailure'],
+        resources: ['*'],
+      }),
+    );
     //
     // Lambda functions acting as Bedrock action groups (stubbed)
     //
@@ -148,6 +154,18 @@ export class SocAgentStack extends Stack {
 
     const notifyFn = this.createActionLambda('NotifyFn', 'notify', lambdaRole, {
       APPROVAL_TOPIC_ARN: approvalTopic.topicArn,
+    });
+
+    const approvalCallbackFn = this.createActionLambda(
+      'ApprovalCallbackFn',
+      'approval-callback',
+      lambdaRole,
+      {},
+      30,
+    );
+
+    const approvalCallbackUrl = approvalCallbackFn.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
     });
 
     approvalTopic.grantPublish(agentInvokerFn);
@@ -224,6 +242,7 @@ export class SocAgentStack extends Stack {
     this.exportValue(evidenceBucket.bucketName, { name: 'EvidenceBucketName' });
     this.exportValue(approvalTopic.topicArn, { name: 'ApprovalTopicArn' });
     this.exportValue(stateMachine.stateMachineArn, { name: 'StateMachineArn' });
+    this.exportValue(approvalCallbackUrl.url, { name: 'ApprovalCallbackUrl' });
   }
 
   private createActionLambda(
