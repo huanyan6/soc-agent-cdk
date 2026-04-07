@@ -167,9 +167,11 @@ export class SocAgentStack extends Stack {
 
     const notifyTask = new tasks.LambdaInvoke(this, 'NotifyHuman', {
       lambdaFunction: notifyFn,
+      integrationPattern: sfn.IntegrationPattern.WAIT_FOR_TASK_TOKEN,
       payload: sfn.TaskInput.fromObject({
         approvalToken: sfn.JsonPath.stringAt('$.approvalToken'),
         summary: sfn.JsonPath.stringAt('$.summary'),
+        taskToken: sfn.JsonPath.taskToken,
       }),
       outputPath: '$.Payload',
     });

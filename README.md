@@ -43,7 +43,9 @@ Outputs include:
 
 ## Approvals quick hook
 - Subscribe an email or Slack webhook to the `ApprovalTopic` SNS output.
-- To enforce approval blocking, adjust `lambda/notify` to emit a Step Functions task token and wait for callback before `ExecuteRemediation`.
+- Already enforced: `NotifyHuman` uses Step Functions task token. Approve by running:  
+  `aws stepfunctions send-task-success --task-token <token> --task-output "{\"approval\":\"approved\"}"`  
+  The token is included in the SNS message. Until approval arrives, the state machine pauses before remediation.
 
 ## Testing locally
 - `npm run build` to type-check.
