@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { BedrockAgentRuntimeClient, InvokeAgentCommand } from '@aws-sdk/client-bedrock-agent-runtime';
 
 const agentId = process.env.AGENT_ID;
-const agentAliasId = process.env.AGENT_ALIAS_ID || '$LATEST';
+const agentAliasId = process.env.AGENT_ALIAS_ID || undefined;
 const bedrockRegion = process.env.BEDROCK_REGION || process.env.AWS_REGION || 'ap-southeast-2';
 
 if (!agentId) {
@@ -24,13 +24,17 @@ export const handler = async (event = {}) => {
     event.trigger ||
     'Analyze latest security signals and propose remediation. Always require human approval.';
 
-  const command = new InvokeAgentCommand({
+  const payload = {
     agentId,
-    agentAliasId,
     sessionId,
     inputText,
     // You can pass context from Security Lake/GuardDuty here via `sessionState` or `memoryId`
-  });
+  };
+  if (agentAliasId) {
+    payload.agentAliasId = agentAliasId;
+  }
+
+  const command = new InvokeAgentCommand(payload);
 
   const result = await client.send(command);
 
