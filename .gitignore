@@ -2,6 +2,7 @@
 node_modules/
 package-lock.json
 lambda/**/node_modules/
+dist/
 
 # CDK output
 cdk.out/

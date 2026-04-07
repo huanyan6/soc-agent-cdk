@@ -98,6 +98,32 @@ export class SocAgentStack extends Stack {
       }),
     );
 
+    lambdaRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: [
+          'acm:RequestCertificate',
+          'acm:DescribeCertificate',
+          'acm:ListCertificates',
+          'acm:AddTagsToCertificate',
+        ],
+        resources: ['*'],
+      }),
+    );
+
+    lambdaRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ['route53:ListHostedZonesByName', 'route53:ChangeResourceRecordSets'],
+        resources: ['*'],
+      }),
+    );
+
+    lambdaRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ['cloudfront:GetDistributionConfig', 'cloudfront:UpdateDistribution'],
+        resources: ['*'],
+      }),
+    );
+
     //
     // Lambda functions acting as Bedrock action groups (stubbed)
     //
@@ -108,9 +134,17 @@ export class SocAgentStack extends Stack {
       BEDROCK_REGION: process.env.BEDROCK_REGION ?? this.region,
     });
 
-    const remediationFn = this.createActionLambda('RemediationFn', 'remediation', lambdaRole, {
-      EVIDENCE_BUCKET: evidenceBucket.bucketName,
-    });
+    const remediationFn = this.createActionLambda(
+      'RemediationFn',
+      'remediation',
+      lambdaRole,
+      {
+        EVIDENCE_BUCKET: evidenceBucket.bucketName,
+        TARGET_DOMAIN: process.env.TARGET_DOMAIN ?? '',
+        CLOUDFRONT_DISTRIBUTION_ID: process.env.CLOUDFRONT_DISTRIBUTION_ID ?? '',
+      },
+      120,
+    );
 
     const notifyFn = this.createActionLambda('NotifyFn', 'notify', lambdaRole, {
       APPROVAL_TOPIC_ARN: approvalTopic.topicArn,
@@ -195,13 +229,14 @@ export class SocAgentStack extends Stack {
     directory: string,
     role: iam.IRole,
     environment?: Record<string, string>,
+    timeoutSeconds = 30,
   ): lambda.Function {
     return new lambda.Function(this, id, {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset(`lambda/${directory}`),
       role,
-      timeout: Duration.seconds(30),
+      timeout: Duration.seconds(timeoutSeconds),
       memorySize: 256,
       environment,
       logRetention: logs.RetentionDays.ONE_MONTH,
