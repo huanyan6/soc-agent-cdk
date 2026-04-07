@@ -98,6 +98,38 @@ export class SocAgentStack extends Stack {
       }),
     );
 
+    lambdaRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: [
+          'acm:RequestCertificate',
+          'acm:DescribeCertificate',
+          'acm:ListCertificates',
+          'acm:AddTagsToCertificate',
+        ],
+        resources: ['*'],
+      }),
+    );
+
+    lambdaRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ['route53:ListHostedZonesByName', 'route53:ChangeResourceRecordSets'],
+        resources: ['*'],
+      }),
+    );
+
+    lambdaRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ['cloudfront:GetDistributionConfig', 'cloudfront:UpdateDistribution'],
+        resources: ['*'],
+      }),
+    );
+
+    lambdaRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ['states:SendTaskSuccess', 'states:SendTaskFailure'],
+        resources: ['*'],
+      }),
+    );
     //
     // Lambda functions acting as Bedrock action groups (stubbed)
     //
@@ -108,12 +140,32 @@ export class SocAgentStack extends Stack {
       BEDROCK_REGION: process.env.BEDROCK_REGION ?? this.region,
     });
 
-    const remediationFn = this.createActionLambda('RemediationFn', 'remediation', lambdaRole, {
-      EVIDENCE_BUCKET: evidenceBucket.bucketName,
-    });
+    const remediationFn = this.createActionLambda(
+      'RemediationFn',
+      'remediation',
+      lambdaRole,
+      {
+        EVIDENCE_BUCKET: evidenceBucket.bucketName,
+        TARGET_DOMAIN: process.env.TARGET_DOMAIN ?? '',
+        CLOUDFRONT_DISTRIBUTION_ID: process.env.CLOUDFRONT_DISTRIBUTION_ID ?? '',
+      },
+      120,
+    );
 
     const notifyFn = this.createActionLambda('NotifyFn', 'notify', lambdaRole, {
       APPROVAL_TOPIC_ARN: approvalTopic.topicArn,
+    });
+
+    const approvalCallbackFn = this.createActionLambda(
+      'ApprovalCallbackFn',
+      'approval-callback',
+      lambdaRole,
+      {},
+      30,
+    );
+
+    const approvalCallbackUrl = approvalCallbackFn.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
     });
 
     approvalTopic.grantPublish(agentInvokerFn);
@@ -133,9 +185,11 @@ export class SocAgentStack extends Stack {
 
     const notifyTask = new tasks.LambdaInvoke(this, 'NotifyHuman', {
       lambdaFunction: notifyFn,
+      integrationPattern: sfn.IntegrationPattern.WAIT_FOR_TASK_TOKEN,
       payload: sfn.TaskInput.fromObject({
         approvalToken: sfn.JsonPath.stringAt('$.approvalToken'),
         summary: sfn.JsonPath.stringAt('$.summary'),
+        taskToken: sfn.JsonPath.taskToken,
       }),
       outputPath: '$.Payload',
     });
@@ -188,6 +242,7 @@ export class SocAgentStack extends Stack {
     this.exportValue(evidenceBucket.bucketName, { name: 'EvidenceBucketName' });
     this.exportValue(approvalTopic.topicArn, { name: 'ApprovalTopicArn' });
     this.exportValue(stateMachine.stateMachineArn, { name: 'StateMachineArn' });
+    this.exportValue(approvalCallbackUrl.url, { name: 'ApprovalCallbackUrl' });
   }
 
   private createActionLambda(
@@ -195,13 +250,14 @@ export class SocAgentStack extends Stack {
     directory: string,
     role: iam.IRole,
     environment?: Record<string, string>,
+    timeoutSeconds = 30,
   ): lambda.Function {
     return new lambda.Function(this, id, {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset(`lambda/${directory}`),
       role,
-      timeout: Duration.seconds(30),
+      timeout: Duration.seconds(timeoutSeconds),
       memorySize: 256,
       environment,
       logRetention: logs.RetentionDays.ONE_MONTH,

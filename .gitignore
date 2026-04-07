@@ -2,6 +2,8 @@
 node_modules/
 package-lock.json
 lambda/**/node_modules/
+dist/
+trust.json
 
 # CDK output
 cdk.out/

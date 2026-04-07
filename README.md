@@ -32,6 +32,21 @@ Outputs include:
 4. **Event sources**: Add more EventBridge rules (Security Hub standards fails, Config noncompliance, scheduled vuln scans).
 5. **Observability**: Pipe Step Functions logs to CloudWatch Logs Insights / OpenTelemetry; emit structured JSON.
 
+## Wiring your Bedrock agent
+- Create or identify a Bedrock Agent and alias in the same region (or set `BEDROCK_REGION`).
+- Set environment variables before deploy:  
+  `set BEDROCK_AGENT_ID=<agent-id>`  
+  `set BEDROCK_AGENT_ALIAS_ID=<alias-id or $LATEST>`  
+  `set BEDROCK_REGION=ap-southeast-2`
+- Deploy: `npx cdk deploy --require-approval never --output .cdk.out`
+- The Lambda `AgentInvokerFn` streams the agent response and returns it as the Step Functions summary.
+
+## Approvals quick hook
+- Subscribe an email or Slack webhook to the `ApprovalTopic` SNS output.
+- Already enforced: `NotifyHuman` uses Step Functions task token. Approve by running:  
+  `aws stepfunctions send-task-success --task-token <token> --task-output "{\"approval\":\"approved\"}"`  
+  The token is included in the SNS message. Until approval arrives, the state machine pauses before remediation.
+
 ## Testing locally
 - `npm run build` to type-check.
 - `cdk diff` to review changes before deploy.
